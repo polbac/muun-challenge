@@ -6,6 +6,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { TerminusModule } from '@nestjs/terminus';
 import { IpsModule } from './ips/ips.module';
 
+import { IpsumModule } from './ipsum/ipsum.module';
+import { IngestModule } from './ingest/ingest.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -22,12 +25,14 @@ import { IpsModule } from './ips/ips.module';
         database: configService.get<string>('DB_NAME'),
         ssl: configService.get<string>('DB_SSL') === 'true' ? { rejectUnauthorized: false } : false,
         autoLoadEntities: true,
-        synchronize: false, // Production mode (use migrations)
+        synchronize: true,
       }),
       inject: [ConfigService],
     }),
     TerminusModule,
     IpsModule,
+    IpsumModule,
+    IngestModule,
   ],
   controllers: [AppController],
   providers: [AppService],
