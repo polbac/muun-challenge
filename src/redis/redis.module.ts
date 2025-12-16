@@ -13,7 +13,10 @@ import { CacheService } from './cache.service';
                 if (!url) {
                     throw new Error('REDIS_URL is not defined in environment variables');
                 }
-                return new Redis(url);
+                return new Redis(url, {
+                    enableOfflineQueue: false,
+                    commandTimeout: 1000, // 1s timeout
+                });
             },
             inject: [ConfigService],
         },

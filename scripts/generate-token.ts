@@ -18,6 +18,6 @@ const payload = {
     username: 'test-user',
 };
 
-const token = jwt.sign(payload, secret, { expiresIn: '1h' });
+const token = jwt.sign(payload, secret, { expiresIn: '24h' });
 console.log('Generated Token:');
 console.log(token);

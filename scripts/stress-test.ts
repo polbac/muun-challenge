@@ -55,7 +55,8 @@ const runBaseline = async (token: string) => {
     await redis.flushdb();
     const ipsNoCache = generateIps(500);
     console.log('Measuring No Cache (Cold)...');
-    await measure('Baseline - No Cache', ipsNoCache, token);
+    const tNoCache = await measure('Baseline - No Cache', ipsNoCache, token);
+    const avgNoCache = tNoCache / ipsNoCache.length;
 
     // WITH CACHE
     await redis.flushdb();
@@ -67,10 +68,13 @@ const runBaseline = async (token: string) => {
     ));
 
     console.log('Measuring With Cache (Warm)...');
-    await measure('Baseline - With Cache', ipsCached, token);
+    const tWithCache = await measure('Baseline - With Cache', ipsCached, token);
+    const avgWithCache = tWithCache / ipsCached.length;
 
     // CLEANUP
     await redis.flushdb();
+
+    return { noCache: avgNoCache, withCache: avgWithCache };
 };
 
 const runIngestionStress = async (token: string) => {
@@ -89,13 +93,11 @@ const runIngestionStress = async (token: string) => {
 
     // NO CACHE (during ingest)
     // Note: Ingestion clears cache at the end, but we are running *during*.
-    // However, we want to control cache state for the test. 
-    // If we flush here, we might interfere or be interfered by ingestion flushing at end.
-    // But for the sake of "No Cache" test, we must ensure keys are missing.
-    // We'll generate new random IPs that likely aren't cached.
+    // We generate new random IPs that likely aren't cached to ensure we hit the DB.
     const ipsNoCache = generateIps(500);
-    console.log('Measuring No Cache (During Ingest)...');
-    await measure('Ingest - No Cache', ipsNoCache, token);
+    console.log('Measuring No Cache (During Ingest) - Ensuring DB Hits...');
+    const tNoCache = await measure('Ingest - No Cache', ipsNoCache, token);
+    const avgNoCache = tNoCache / ipsNoCache.length;
 
     // WITH CACHE (during ingest)
     // We will warm up a set of IPs and then test them.
@@ -106,13 +108,15 @@ const runIngestionStress = async (token: string) => {
     ));
 
     console.log('Measuring With Cache (During Ingest)...');
-    await measure('Ingest - With Cache', ipsCached, token);
+    const tWithCache = await measure('Ingest - With Cache', ipsCached, token);
+    const avgWithCache = tWithCache / ipsCached.length;
 
     console.log('Waiting for ingestion to finish...');
     await new Promise<void>((resolve) => {
         ingestProcess.on('exit', () => resolve());
     });
     console.log('Ingestion finished.');
+    return { noCache: avgNoCache, withCache: avgWithCache };
 };
 
 const main = async () => {
@@ -120,8 +124,20 @@ const main = async () => {
     console.log('Token generated.');
 
     try {
-        await runBaseline(token);
-        await runIngestionStress(token);
+        const baselineMetrics = await runBaseline(token);
+        const ingestMetrics = await runIngestionStress(token);
+
+        console.log('\n\n================================================================');
+        console.log('                        STRESS TEST RESULTS                     ');
+        console.log('================================================================');
+        console.table([
+            { Scenario: 'Baseline (Idle)', Condition: 'No Cache (DB Hit)', 'Avg Time (ms)': baselineMetrics.noCache.toFixed(2) },
+            { Scenario: 'Baseline (Idle)', Condition: 'With Cache (Hit)', 'Avg Time (ms)': baselineMetrics.withCache.toFixed(2) },
+            { Scenario: 'During Ingestion', Condition: 'No Cache (DB Hit)', 'Avg Time (ms)': ingestMetrics.noCache.toFixed(2) },
+            { Scenario: 'During Ingestion', Condition: 'With Cache (Hit)', 'Avg Time (ms)': ingestMetrics.withCache.toFixed(2) },
+        ]);
+        console.log('================================================================\n');
+
     } catch (e) {
         console.error('Test failed', e);
     } finally {
