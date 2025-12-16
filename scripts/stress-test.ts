@@ -44,79 +44,74 @@ const measure = async (label: string, ips: string[], token: string) => {
 
     await Promise.all(promises);
     const duration = Date.now() - start;
-    console.log(`[${label}] 500 requests took ${duration}ms. (Avg: ${(duration / ips.length).toFixed(2)}ms/req). Errors: ${errors}`);
-    return duration;
+    const avg = duration / ips.length;
+    console.log(`[${label}] 500 requests took ${duration}ms. (Avg: ${avg.toFixed(2)}ms/req). Errors: ${errors}`);
+    return avg;
 };
 
 const runBaseline = async (token: string) => {
-    console.log('\n--- Scenario 1: Baseline ---');
-
-    // NO CACHE
-    await redis.flushdb();
-    const ipsNoCache = generateIps(500);
-    console.log('Measuring No Cache (Cold)...');
-    const tNoCache = await measure('Baseline - No Cache', ipsNoCache, token);
-    const avgNoCache = tNoCache / ipsNoCache.length;
-
-    // WITH CACHE
-    await redis.flushdb();
-    const ipsCached = generateIps(500);
-    console.log('Warming cache for 500 IPs...');
-    // Warm up
-    await Promise.all(ipsCached.map(ip =>
-        axios.get(`${API_URL}/ips/${ip}`, { headers: { Authorization: `Bearer ${token}` } })
-    ));
-
-    console.log('Measuring With Cache (Warm)...');
-    const tWithCache = await measure('Baseline - With Cache', ipsCached, token);
-    const avgWithCache = tWithCache / ipsCached.length;
-
-    // CLEANUP
+    console.log('\n--- Phase 1: Baseline ---');
     await redis.flushdb();
 
-    return { noCache: avgNoCache, withCache: avgWithCache };
+    // 1. Request 500 IPs (Cold)
+    const ips = generateIps(500);
+    console.log('Requesting 500 IPs (No Cache)...');
+    const avgNoCache = await measure('Baseline - No Cache', ips, token);
+
+    // 2. Request same 500 IPs (Warm)
+    console.log('Requesting same 500 IPs (Cached)...');
+    const avgCached = await measure('Baseline - Cached', ips, token);
+
+    // Cleanup
+    await redis.flushdb();
+    return { avgNoCache, avgCached };
 };
 
 const runIngestionStress = async (token: string) => {
-    console.log('\n--- Scenario 2: Ingestion Stress ---');
+    console.log('\n--- Phase 2: Ingestion Stress ---');
     console.log('Starting ingestion...');
+    const ingestStart = Date.now();
 
+    let totalIps = 0;
     const ingestProcess = spawn('npm', ['run', 'ingest:ips'], {
         cwd: process.cwd(),
-        stdio: 'inherit' // Pipe output to see ingestion logs
+        stdio: ['ignore', 'pipe', 'pipe']
     });
 
-    // Give ingestion a moment to actually start running/processing
+    // Capture output to find total IPs
+    ingestProcess.stdout.on('data', (data) => {
+        const output = data.toString();
+        process.stdout.write(output); // Passthrough
+        const match = output.match(/Starting ingestion of (\d+) IPs/);
+        if (match) {
+            totalIps = parseInt(match[1], 10);
+        }
+    });
+    ingestProcess.stderr.pipe(process.stderr);
+
+    // Wait 2s to ensure ingestion starts
     await new Promise(r => setTimeout(r, 2000));
 
-    // RUN MEASUREMENTS CONCURRENTLY
+    // 1. Request 500 NEW IPs (Cold) during ingest
+    const ips = generateIps(500); // New random IPs
+    console.log('Requesting 500 IPs (No Cache, During Ingest)...');
+    const avgNoCache = await measure('Ingest - No Cache', ips, token);
 
-    // NO CACHE (during ingest)
-    // Note: Ingestion clears cache at the end, but we are running *during*.
-    // We generate new random IPs that likely aren't cached to ensure we hit the DB.
-    const ipsNoCache = generateIps(500);
-    console.log('Measuring No Cache (During Ingest) - Ensuring DB Hits...');
-    const tNoCache = await measure('Ingest - No Cache', ipsNoCache, token);
-    const avgNoCache = tNoCache / ipsNoCache.length;
-
-    // WITH CACHE (during ingest)
-    // We will warm up a set of IPs and then test them.
-    const ipsCached = generateIps(500);
-    console.log('Warming cache (During Ingest)...');
-    await Promise.all(ipsCached.map(ip =>
-        axios.get(`${API_URL}/ips/${ip}`, { headers: { Authorization: `Bearer ${token}` } })
-    ));
-
-    console.log('Measuring With Cache (During Ingest)...');
-    const tWithCache = await measure('Ingest - With Cache', ipsCached, token);
-    const avgWithCache = tWithCache / ipsCached.length;
+    // 2. Request same 500 IPs (Warm) during ingest
+    console.log('Requesting same 500 IPs (Cached, During Ingest)...');
+    const avgCached = await measure('Ingest - Cached', ips, token);
 
     console.log('Waiting for ingestion to finish...');
     await new Promise<void>((resolve) => {
         ingestProcess.on('exit', () => resolve());
     });
-    console.log('Ingestion finished.');
-    return { noCache: avgNoCache, withCache: avgWithCache };
+
+    const ingestDuration = Date.now() - ingestStart;
+    console.log(`Ingestion finished in ${ingestDuration}ms.`);
+
+    const timePerInsert = totalIps > 0 ? (ingestDuration / totalIps) : 0;
+
+    return { avgNoCache, avgCached, ingestDuration, timePerInsert, totalIps };
 };
 
 const main = async () => {
@@ -124,18 +119,23 @@ const main = async () => {
     console.log('Token generated.');
 
     try {
-        const baselineMetrics = await runBaseline(token);
-        const ingestMetrics = await runIngestionStress(token);
+        const p1 = await runBaseline(token);
+        const p2 = await runIngestionStress(token);
 
         console.log('\n\n================================================================');
         console.log('                        STRESS TEST RESULTS                     ');
         console.log('================================================================');
         console.table([
-            { Scenario: 'Baseline (Idle)', Condition: 'No Cache (DB Hit)', 'Avg Time (ms)': baselineMetrics.noCache.toFixed(2) },
-            { Scenario: 'Baseline (Idle)', Condition: 'With Cache (Hit)', 'Avg Time (ms)': baselineMetrics.withCache.toFixed(2) },
-            { Scenario: 'During Ingestion', Condition: 'No Cache (DB Hit)', 'Avg Time (ms)': ingestMetrics.noCache.toFixed(2) },
-            { Scenario: 'During Ingestion', Condition: 'With Cache (Hit)', 'Avg Time (ms)': ingestMetrics.withCache.toFixed(2) },
+            { Phase: '1 - Baseline', Condition: 'No Cache', 'Avg Time (ms)': p1.avgNoCache.toFixed(2) },
+            { Phase: '1 - Baseline', Condition: 'Cached', 'Avg Time (ms)': p1.avgCached.toFixed(2) },
+            { Phase: '2 - Ingest', Condition: 'No Cache', 'Avg Time (ms)': p2.avgNoCache.toFixed(2) },
+            { Phase: '2 - Ingest', Condition: 'Cached', 'Avg Time (ms)': p2.avgCached.toFixed(2) },
         ]);
+
+        console.log('\nINGESTION METRICS:');
+        console.log(`Total Ingestion Time: ${p2.ingestDuration}ms`);
+        console.log(`Total IPs Ingested:   ${p2.totalIps}`);
+        console.log(`Avg Time per IP:      ${p2.timePerInsert.toFixed(4)}ms`);
         console.log('================================================================\n');
 
     } catch (e) {
