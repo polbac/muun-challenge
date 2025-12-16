@@ -14,8 +14,6 @@ export class IpsumService {
         const { data: text } = await firstValueFrom(this.httpService.get(this.url));
         const lines = text.split('\n');
 
-        console.log(lines.length)
-
         const ips = lines
             .filter(line => {
 

@@ -9,13 +9,18 @@ import { CacheService } from './cache.service';
         {
             provide: 'REDIS_CLIENT',
             useFactory: (configService: ConfigService) => {
-                const url = configService.get<string>('REDIS_URL');
-                if (!url) {
-                    throw new Error('REDIS_URL is not defined in environment variables');
+                const host = configService.get<string>('REDIS_HOST');
+                const port = configService.get<number>('REDIS_PORT');
+
+                if (!host || !port) {
+                    throw new Error('REDIS_HOST or REDIS_PORT is not defined in environment variables');
                 }
-                return new Redis(url, {
+
+                return new Redis({
+                    host,
+                    port,
                     enableOfflineQueue: false,
-                    commandTimeout: 1000, // 1s timeout
+                    commandTimeout: 1000,
                 });
             },
             inject: [ConfigService],

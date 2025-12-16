@@ -1,24 +1,24 @@
 version: '3.8'
 
 services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - "${PORT}:${PORT}"
-    depends_on:
-      - postgres
-      - redis
-    env_file:
-      - .env
-    environment:
-      DB_HOST: postgres
-      REDIS_HOST: redis
-    volumes:
-      - .:/usr/src/app
-      - /usr/src/app/node_modules
-    command: npm run start:dev
+  #app:
+  #  build:
+  #    context: .
+  #    dockerfile: Dockerfile
+  #  ports:
+  #    - "${PORT}:${PORT}"
+  #  depends_on:
+  #    - postgres
+  #    - redis
+  #  env_file:
+  #    - .env
+  #  environment:
+  #    DB_HOST: postgres
+  #    REDIS_HOST: redis
+  #  volumes:
+  #    - .:/usr/src/app
+  #    - /usr/src/app/node_modules
+  #  command: npm run start:dev
 
   postgres:
     image: postgres:15-alpine
