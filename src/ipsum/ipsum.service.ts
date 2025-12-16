@@ -14,27 +14,19 @@ export class IpsumService {
         const { data: text } = await firstValueFrom(this.httpService.get(this.url));
         const lines = text.split('\n');
 
+        console.log(lines.length)
+
         const ips = lines
             .filter(line => {
-                // Remove comments
-                if (line.trim().startsWith('#')) return false;
-                // Remove empty lines
-                if (!line.trim()) return false;
-                // grep -v -E "\s[1-2]$" logic: exclude lines ending with space + 1 or 2
-                // The original file format is: IP  hits  severity ...
-                // The command was: grep -v -E "\s[1-2]$"
-                // This implies filtering based on some column.
-                // However, let's implement the filter exactly as requested.
-                // "cut -f 1" implies the first field is the IP.
 
-                // Check exclusion first
-                if (/\s[1-2]$/.test(line)) {
-                    return false;
-                }
+                if (line.trim().startsWith('#')) return false;
+
+                if (!line.trim()) return false;
+
                 return true;
             })
-            .map(line => line.split(/\s+/)[0]) // cut -f 1 equivalent (assuming space/tab separated)
-            .filter(ip => ip); // Remove empty strings if any
+            .map(line => line.split(/\s+/)[0])
+            .filter(ip => ip);
 
         this.logger.log(`Fetched and parsed ${ips.length} IPs`);
         return ips;

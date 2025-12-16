@@ -1,11 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { CacheService } from '../redis/cache.service';
 
 @Injectable()
 export class IngestService {
     private readonly logger = new Logger(IngestService.name);
 
-    constructor(private readonly dataSource: DataSource) { }
+    constructor(
+        private readonly dataSource: DataSource,
+        private readonly cacheService: CacheService,
+    ) { }
 
     async ingestIps(ips: string[]): Promise<void> {
         this.logger.log(`Starting ingestion of ${ips.length} IPs`);
@@ -61,6 +65,9 @@ export class IngestService {
 
                 await queryRunner.commitTransaction();
                 this.logger.log('Table swap successful');
+
+                this.logger.log('Flushing Redis cache');
+                await this.cacheService.flush();
             } catch (err) {
                 this.logger.error('Transaction failed, rolling back', err);
                 await queryRunner.rollbackTransaction();
