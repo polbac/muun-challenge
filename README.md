@@ -26,7 +26,13 @@ npm install
 Edit .env and edit JWT_SECRET with a random string (recommended using a tool like https://jwtsecrets.com/)
 
 
-5. Start the application
+5. Run migrations
+
+```
+migration:run
+```
+
+6. Start the application
 
 ```
 npm run start
@@ -62,4 +68,10 @@ npm run migration:run
 
 ```bash
 npm run ingest:ips
+```
+
+### Stress test (you need run the app first)
+
+```bash
+npm run stress:test
 ```
