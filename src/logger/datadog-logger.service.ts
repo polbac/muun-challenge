@@ -1,72 +1,106 @@
 import { LoggerService, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as winston from 'winston';
 
 @Injectable()
 export class DatadogLogger implements LoggerService {
-    private ddLogger: any;
-    private isEnabled: boolean;
+    private winstonLogger: winston.Logger;
+    private isDatadogEnabled: boolean;
 
     constructor(private configService: ConfigService) {
-        this.isEnabled = this.configService.get<string>('DD_API_KEY') ? true : false;
+        this.isDatadogEnabled = !!this.configService.get<string>('DD_API_KEY');
 
-        if (this.isEnabled) {
-            // Only require dd-trace if Datadog is enabled
-            const tracer = require('dd-trace');
-            tracer.init({
+        const transports: winston.transport[] = [
+            // Always log to console
+            new winston.transports.Console({
+                format: winston.format.combine(
+                    winston.format.timestamp(),
+                    winston.format.colorize(),
+                    winston.format.printf(({ timestamp, level, message, context, ...meta }) => {
+                        const ctx = context ? `[${context}]` : '';
+                        const metaStr = Object.keys(meta).length ? JSON.stringify(meta) : '';
+                        return `${timestamp} ${level} ${ctx} ${message} ${metaStr}`;
+                    })
+                ),
+            }),
+        ];
+
+        // Add Datadog HTTP transport if API key is configured
+        if (this.isDatadogEnabled) {
+            const ddApiKey = this.configService.get<string>('DD_API_KEY');
+            const ddService = this.configService.get<string>('DD_SERVICE') || 'muun-challenge';
+            const ddEnv = this.configService.get<string>('DD_ENV') || 'development';
+            const ddSite = this.configService.get<string>('DD_SITE') || 'datadoghq.com';
+
+            transports.push(
+                new winston.transports.Http({
+                    host: `http-intake.logs.${ddSite}`,
+                    path: `/api/v2/logs`,
+                    ssl: true,
+                    headers: {
+                        'DD-API-KEY': ddApiKey,
+                        'Content-Type': 'application/json',
+                    },
+                    format: winston.format.combine(
+                        winston.format.timestamp(),
+                        winston.format.json()
+                    ),
+                })
+            );
+        }
+
+        this.winstonLogger = winston.createLogger({
+            level: 'debug',
+            format: winston.format.combine(
+                winston.format.timestamp(),
+                winston.format.errors({ stack: true }),
+                winston.format.json()
+            ),
+            defaultMeta: {
                 service: this.configService.get<string>('DD_SERVICE') || 'muun-challenge',
                 env: this.configService.get<string>('DD_ENV') || 'development',
-                version: this.configService.get<string>('DD_VERSION') || '1.0.0',
-                logInjection: true,
-            });
-            this.ddLogger = tracer;
-        }
-    }
-
-    private formatMessage(message: any, context?: string): string {
-        const timestamp = new Date().toISOString();
-        const ctx = context ? `[${context}]` : '';
-        return `${timestamp} ${ctx} ${typeof message === 'object' ? JSON.stringify(message) : message}`;
+            },
+            transports,
+        });
     }
 
     log(message: any, context?: string) {
-        const formatted = this.formatMessage(message, context);
-        console.log(formatted);
-        if (this.isEnabled && this.ddLogger) {
-            this.ddLogger.trace('log', { message, context });
+        if (typeof message === 'object') {
+            this.winstonLogger.info({ ...message, context });
+        } else {
+            this.winstonLogger.info(message, { context });
         }
     }
 
     error(message: any, trace?: string, context?: string) {
-        const formatted = this.formatMessage(message, context);
-        console.error(formatted);
-        if (trace) console.error(trace);
-
-        if (this.isEnabled && this.ddLogger) {
-            this.ddLogger.trace('error', { message, trace, context });
+        if (typeof message === 'object') {
+            this.winstonLogger.error({ ...message, trace, context });
+        } else {
+            this.winstonLogger.error(message, { trace, context });
         }
     }
 
     warn(message: any, context?: string) {
-        const formatted = this.formatMessage(message, context);
-        console.warn(formatted);
-        if (this.isEnabled && this.ddLogger) {
-            this.ddLogger.trace('warn', { message, context });
+        if (typeof message === 'object') {
+            this.winstonLogger.warn({ ...message, context });
+        } else {
+            this.winstonLogger.warn(message, { context });
         }
     }
 
     debug(message: any, context?: string) {
-        const formatted = this.formatMessage(message, context);
-        console.debug(formatted);
-        if (this.isEnabled && this.ddLogger) {
-            this.ddLogger.trace('debug', { message, context });
+        if (typeof message === 'object') {
+            this.winstonLogger.debug({ ...message, context });
+        } else {
+            this.winstonLogger.debug(message, { context });
         }
     }
 
     verbose(message: any, context?: string) {
-        const formatted = this.formatMessage(message, context);
-        console.log(formatted);
-        if (this.isEnabled && this.ddLogger) {
-            this.ddLogger.trace('verbose', { message, context });
+        if (typeof message === 'object') {
+            this.winstonLogger.verbose({ ...message, context });
+        } else {
+            this.winstonLogger.verbose(message, { context });
         }
     }
 }

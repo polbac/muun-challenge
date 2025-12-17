@@ -1,3 +1,6 @@
+// IMPORTANT: Tracer must be imported first for APM to work
+import './tracer';
+
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
