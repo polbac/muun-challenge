@@ -4,76 +4,82 @@ import { ConfigService } from '@nestjs/config';
 import { UnauthorizedException } from '@nestjs/common';
 
 describe('AdminAuthMiddleware', () => {
-    let middleware: AdminAuthMiddleware;
-    let configService: ConfigService;
+  let middleware: AdminAuthMiddleware;
+  let configService: ConfigService;
 
-    const mockConfigService = {
-        get: jest.fn(),
-    };
+  const mockConfigService = {
+    get: jest.fn(),
+  };
 
-    beforeEach(async () => {
-        const module: TestingModule = await Test.createTestingModule({
-            providers: [
-                AdminAuthMiddleware,
-                { provide: ConfigService, useValue: mockConfigService },
-            ],
-        }).compile();
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AdminAuthMiddleware,
+        { provide: ConfigService, useValue: mockConfigService },
+      ],
+    }).compile();
 
-        middleware = module.get<AdminAuthMiddleware>(AdminAuthMiddleware);
-        configService = module.get<ConfigService>(ConfigService);
+    middleware = module.get<AdminAuthMiddleware>(AdminAuthMiddleware);
+    configService = module.get<ConfigService>(ConfigService);
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should be defined', () => {
+    expect(middleware).toBeDefined();
+  });
+
+  describe('use', () => {
+    it('should call next() if admin token is valid', () => {
+      const req: any = { headers: { 'x-admin-token': 'valid-token' } };
+      const res: any = {};
+      const next = jest.fn();
+
+      mockConfigService.get.mockReturnValue('valid-token');
+
+      middleware.use(req, res, next);
+
+      expect(next).toHaveBeenCalled();
     });
 
-    afterEach(() => {
-        jest.clearAllMocks();
+    it('should throw UnauthorizedException if token is missing', () => {
+      const req: any = { headers: {} };
+      const res: any = {};
+      const next = jest.fn();
+
+      mockConfigService.get.mockReturnValue('valid-token');
+
+      expect(() => middleware.use(req, res, next)).toThrow(
+        UnauthorizedException,
+      );
+      expect(next).not.toHaveBeenCalled();
     });
 
-    it('should be defined', () => {
-        expect(middleware).toBeDefined();
+    it('should throw UnauthorizedException if token is invalid', () => {
+      const req: any = { headers: { 'x-admin-token': 'invalid-token' } };
+      const res: any = {};
+      const next = jest.fn();
+
+      mockConfigService.get.mockReturnValue('valid-token');
+
+      expect(() => middleware.use(req, res, next)).toThrow(
+        UnauthorizedException,
+      );
+      expect(next).not.toHaveBeenCalled();
     });
 
-    describe('use', () => {
-        it('should call next() if admin token is valid', () => {
-            const req: any = { headers: { 'x-admin-token': 'valid-token' } };
-            const res: any = {};
-            const next = jest.fn();
+    it('should throw error if ADMIN_TOKEN is not configured', () => {
+      const req: any = { headers: { 'x-admin-token': 'some-token' } };
+      const res: any = {};
+      const next = jest.fn();
 
-            mockConfigService.get.mockReturnValue('valid-token');
+      mockConfigService.get.mockReturnValue(undefined);
 
-            middleware.use(req, res, next);
-
-            expect(next).toHaveBeenCalled();
-        });
-
-        it('should throw UnauthorizedException if token is missing', () => {
-            const req: any = { headers: {} };
-            const res: any = {};
-            const next = jest.fn();
-
-            mockConfigService.get.mockReturnValue('valid-token');
-
-            expect(() => middleware.use(req, res, next)).toThrow(UnauthorizedException);
-            expect(next).not.toHaveBeenCalled();
-        });
-
-        it('should throw UnauthorizedException if token is invalid', () => {
-            const req: any = { headers: { 'x-admin-token': 'invalid-token' } };
-            const res: any = {};
-            const next = jest.fn();
-
-            mockConfigService.get.mockReturnValue('valid-token');
-
-            expect(() => middleware.use(req, res, next)).toThrow(UnauthorizedException);
-            expect(next).not.toHaveBeenCalled();
-        });
-
-        it('should throw error if ADMIN_TOKEN is not configured', () => {
-            const req: any = { headers: { 'x-admin-token': 'some-token' } };
-            const res: any = {};
-            const next = jest.fn();
-
-            mockConfigService.get.mockReturnValue(undefined);
-
-            expect(() => middleware.use(req, res, next)).toThrow('ADMIN_TOKEN not configured');
-        });
+      expect(() => middleware.use(req, res, next)).toThrow(
+        'ADMIN_TOKEN not configured',
+      );
     });
+  });
 });

@@ -3,7 +3,7 @@ import { DatadogLogger } from './datadog-logger.service';
 
 @Global()
 @Module({
-    providers: [DatadogLogger],
-    exports: [DatadogLogger],
+  providers: [DatadogLogger],
+  exports: [DatadogLogger],
 })
-export class LoggerModule { }
+export class LoggerModule {}

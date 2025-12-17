@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppController } from './app.controller';
-import { HealthCheckService, TypeOrmHealthIndicator, MicroserviceHealthIndicator } from '@nestjs/terminus';
+import {
+  HealthCheckService,
+  TypeOrmHealthIndicator,
+  MicroserviceHealthIndicator,
+} from '@nestjs/terminus';
 import { ConfigService } from '@nestjs/config';
 
 describe('AppController', () => {
@@ -31,8 +35,14 @@ describe('AppController', () => {
       controllers: [AppController],
       providers: [
         { provide: HealthCheckService, useValue: mockHealthCheckService },
-        { provide: TypeOrmHealthIndicator, useValue: mockTypeOrmHealthIndicator },
-        { provide: MicroserviceHealthIndicator, useValue: mockMicroserviceHealthIndicator },
+        {
+          provide: TypeOrmHealthIndicator,
+          useValue: mockTypeOrmHealthIndicator,
+        },
+        {
+          provide: MicroserviceHealthIndicator,
+          useValue: mockMicroserviceHealthIndicator,
+        },
         { provide: ConfigService, useValue: mockConfigService },
       ],
     }).compile();

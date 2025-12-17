@@ -6,13 +6,11 @@ import { IpsumModule } from '../ipsum/ipsum.module';
 import { IngestModule } from '../ingest/ingest.module';
 
 @Module({
-    imports: [AuthModule, IpsumModule, IngestModule],
-    controllers: [AdminController],
+  imports: [AuthModule, IpsumModule, IngestModule],
+  controllers: [AdminController],
 })
 export class AdminModule implements NestModule {
-    configure(consumer: MiddlewareConsumer) {
-        consumer
-            .apply(AdminAuthMiddleware)
-            .forRoutes(AdminController);
-    }
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(AdminAuthMiddleware).forRoutes(AdminController);
+  }
 }

@@ -1,5 +1,10 @@
 import { Controller, Get } from '@nestjs/common';
-import { HealthCheck, HealthCheckService, TypeOrmHealthIndicator, MicroserviceHealthIndicator } from '@nestjs/terminus';
+import {
+  HealthCheck,
+  HealthCheckService,
+  TypeOrmHealthIndicator,
+  MicroserviceHealthIndicator,
+} from '@nestjs/terminus';
 import { Transport } from '@nestjs/microservices';
 import { ConfigService } from '@nestjs/config';
 
@@ -10,20 +15,21 @@ export class AppController {
     private db: TypeOrmHealthIndicator,
     private microservice: MicroserviceHealthIndicator,
     private config: ConfigService,
-  ) { }
+  ) {}
 
   @Get()
   @HealthCheck()
   check() {
     return this.health.check([
       () => this.db.pingCheck('database'),
-      () => this.microservice.pingCheck('redis', {
-        transport: Transport.REDIS,
-        options: {
-          host: this.config.get('REDIS_HOST'),
-          port: this.config.get('REDIS_PORT'),
-        },
-      }),
+      () =>
+        this.microservice.pingCheck('redis', {
+          transport: Transport.REDIS,
+          options: {
+            host: this.config.get('REDIS_HOST'),
+            port: this.config.get('REDIS_PORT'),
+          },
+        }),
     ]);
   }
 }

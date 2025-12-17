@@ -9,9 +9,9 @@ import { RedisModule } from '../redis/redis.module';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([Ip]), RedisModule, AuthModule],
-    controllers: [IpsController],
-    providers: [IpsService, IpsRepository],
-    exports: [IpsService],
+  imports: [TypeOrmModule.forFeature([Ip]), RedisModule, AuthModule],
+  controllers: [IpsController],
+  providers: [IpsService, IpsRepository],
+  exports: [IpsService],
 })
-export class IpsModule { }
+export class IpsModule {}

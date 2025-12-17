@@ -58,7 +58,7 @@ npm run start:dev
 ### Create a JWT token
 
 ```bash
-npm run auth:token
+npm run auth:generate-token
 ```
 
 ### Run migrations

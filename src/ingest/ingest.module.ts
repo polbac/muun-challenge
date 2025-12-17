@@ -4,8 +4,8 @@ import { IpsumModule } from '../ipsum/ipsum.module';
 import { RedisModule } from '../redis/redis.module';
 
 @Module({
-    imports: [IpsumModule, RedisModule],
-    providers: [IngestService],
-    exports: [IngestService],
+  imports: [IpsumModule, RedisModule],
+  providers: [IngestService],
+  exports: [IngestService],
 })
-export class IngestModule { }
+export class IngestModule {}
