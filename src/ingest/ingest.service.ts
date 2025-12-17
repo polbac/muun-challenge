@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CacheService } from '../redis/cache.service';
+import { from as copyFrom } from 'pg-copy-streams';
+import { Readable } from 'stream';
 
 @Injectable()
 export class IngestService {
@@ -25,31 +27,46 @@ export class IngestService {
 
       await queryRunner.query(`CREATE TABLE ips_temp (LIKE ips INCLUDING ALL)`);
 
-      // 2. Insert data into temporary table
-      this.logger.log('Inserting data into ips_temp');
-      const BATCH_SIZE = 1000;
-      for (let i = 0; i < ips.length; i += BATCH_SIZE) {
-        const batch = ips.slice(i, i + BATCH_SIZE);
+      // 2. Insert data into temporary table using COPY
+      this.logger.log(`Copying ${ips.length} IPs into ips_temp using COPY`);
 
-        const values = batch.map((_, index) => `($${index + 1})`).join(', ');
-        await queryRunner.query(
-          `INSERT INTO ips_temp (ip) VALUES ${values}`,
-          batch,
+      // Access the native PostgreSQL client
+
+      const pool = (queryRunner.connection.driver as any).master;
+      const client = await pool.connect();
+
+      try {
+        // Create COPY stream
+        const copyStream = client.query(
+          copyFrom('COPY ips_temp (ip) FROM STDIN'),
         );
+
+        // Create readable stream from IP array
+        const dataStream = Readable.from(ips.map((ip) => `${ip}\n`));
+
+        // Pipe data to COPY stream
+        await new Promise((resolve, reject) => {
+          dataStream.pipe(copyStream);
+          copyStream.on('finish', resolve);
+          copyStream.on('error', reject);
+          dataStream.on('error', reject);
+        });
+
+        this.logger.log('COPY operation complete');
+      } finally {
+        // Release the client back to the pool
+        client.release();
       }
-      this.logger.log('Insertion complete');
 
       // 3. Swap tables atomically
       this.logger.log('Swapping tables');
       await queryRunner.startTransaction();
       try {
-        // Let's try the detach approach.
-        const seqName = 'ips_id_seq'; // Assumption based on standard naming
+        const seqName = 'ips_id_seq';
 
         try {
           await queryRunner.query(`ALTER SEQUENCE ${seqName} OWNED BY NONE`);
         } catch (e) {
-          // Ignore if sequence doesn't exist or other minor error
           this.logger.warn(
             'Could not detach sequence, maybe it does not exist or named differently',
             e,

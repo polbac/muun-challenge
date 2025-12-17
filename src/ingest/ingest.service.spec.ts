@@ -8,6 +8,24 @@ describe('IngestService', () => {
   let dataSource: DataSource;
   let cacheService: CacheService;
 
+  const mockCopyStream = {
+    on: jest.fn(),
+    once: jest.fn(),
+    write: jest.fn().mockReturnValue(true),
+    end: jest.fn(),
+    emit: jest.fn(),
+    removeListener: jest.fn(),
+  };
+
+  const mockClient = {
+    query: jest.fn().mockReturnValue(mockCopyStream),
+    release: jest.fn(),
+  };
+
+  const mockPool = {
+    connect: jest.fn().mockResolvedValue(mockClient),
+  };
+
   const mockQueryRunner = {
     connect: jest.fn(),
     startTransaction: jest.fn(),
@@ -15,6 +33,11 @@ describe('IngestService', () => {
     rollbackTransaction: jest.fn(),
     release: jest.fn(),
     query: jest.fn(),
+    connection: {
+      driver: {
+        master: mockPool,
+      },
+    },
   };
 
   const mockDataSource = {
@@ -26,13 +49,33 @@ describe('IngestService', () => {
   };
 
   beforeEach(async () => {
-    // Reset mocks specifically implementations
+    // Reset mocks
     mockQueryRunner.query.mockResolvedValue([]);
     mockQueryRunner.connect.mockResolvedValue(undefined);
     mockQueryRunner.startTransaction.mockResolvedValue(undefined);
     mockQueryRunner.commitTransaction.mockResolvedValue(undefined);
     mockQueryRunner.rollbackTransaction.mockResolvedValue(undefined);
     mockQueryRunner.release.mockResolvedValue(undefined);
+    mockClient.release.mockResolvedValue(undefined);
+    mockPool.connect.mockResolvedValue(mockClient);
+    mockClient.query.mockReturnValue(mockCopyStream);
+
+    // Setup COPY stream to emit finish event
+    let finishHandler: (() => void) | null = null;
+    mockCopyStream.on.mockImplementation((event, handler) => {
+      if (event === 'finish') {
+        finishHandler = handler;
+      }
+      return mockCopyStream;
+    });
+
+    // Simulate stream finishing after write
+    mockCopyStream.end.mockImplementation(() => {
+      if (finishHandler) {
+        setTimeout(() => finishHandler(), 0);
+      }
+      return mockCopyStream;
+    });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -68,11 +111,14 @@ describe('IngestService', () => {
       expect.stringContaining('CREATE TABLE ips_temp'),
     );
 
-    // Insertion
-    expect(mockQueryRunner.query).toHaveBeenCalledWith(
-      expect.stringContaining('INSERT INTO ips_temp'),
-      ips,
+    // COPY operation
+    expect(mockPool.connect).toHaveBeenCalled();
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: 'COPY ips_temp (ip) FROM STDIN',
+      }),
     );
+    expect(mockClient.release).toHaveBeenCalled();
 
     // Table swap
     expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
@@ -169,23 +215,25 @@ describe('IngestService', () => {
     expect(mockQueryRunner.query).toHaveBeenCalledWith(
       expect.stringContaining('CREATE TABLE ips_temp'),
     );
-    // Loop not entered, so no INSERT
-    expect(mockQueryRunner.query).not.toHaveBeenCalledWith(
-      expect.stringContaining('INSERT INTO ips_temp'),
-      expect.anything(),
+    // COPY should still be called, just with empty data
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: 'COPY ips_temp (ip) FROM STDIN',
+      }),
     );
   });
 
-  it('should handle large batches', async () => {
-    // 1001 IPs to force 2 batches
-    const largeList = Array(1001).fill('1.1.1.1');
+  it('should handle large datasets efficiently with COPY', async () => {
+    // Large dataset to verify COPY handles it in one operation
+    const largeList = Array(10000).fill('1.1.1.1');
     await service.ingestIps(largeList);
 
-    // Should interpret INSERT twice
-    // 2 calls to INSERT
-    const insertCalls = mockQueryRunner.query.mock.calls.filter((call) =>
-      call[0].includes('INSERT INTO ips_temp'),
+    // Should use COPY once regardless of size
+    expect(mockClient.query).toHaveBeenCalledTimes(1);
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: 'COPY ips_temp (ip) FROM STDIN',
+      }),
     );
-    expect(insertCalls.length).toBe(2);
   });
 });
