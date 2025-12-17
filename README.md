@@ -1,6 +1,17 @@
 
 # 🚏 IP Blocklist Service Assignment
 
+A NestJS REST API that checks if IP addresses are blocked. It maintains a blocklist and provides fast lookups.
+
+## Stack
+
+- Node
+- TS
+- Nest
+- PostgreSQL
+- Redis
+- TypeORM
+
 ## Instructions
 
 ### Clone the repository
