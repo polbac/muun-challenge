@@ -87,5 +87,5 @@ npm run ingest:ips
 ### Stress test (you need run the app first)
 
 ```bash
-npm run stress:test
+npm run test:stress
 ```
