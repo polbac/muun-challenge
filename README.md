@@ -25,6 +25,10 @@ npm install
 
 Edit .env and edit JWT_SECRET with a random string (recommended using a tool like https://jwtsecrets.com/)
 
+### Configure ADMIN_TOKEN
+
+Edit .env and edit ADMIN_TOKEN with a random string (recommended using a tool like https://jwtsecrets.com/)
+
 ### Run migrations
 
 ```
