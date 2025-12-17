@@ -4,7 +4,7 @@ import { IpsumService } from '../ipsum/ipsum.service';
 import { IngestService } from '../ingest/ingest.service';
 import { Logger } from '@nestjs/common';
 
-async function ingestBlockedIps() {
+export async function ingestBlockedIps() {
     const logger = new Logger('IngestBlockedIps');
     logger.log('Starting Ingest Blocked IPs Lambda');
 
@@ -28,4 +28,6 @@ async function ingestBlockedIps() {
     }
 }
 
-ingestBlockedIps();
+if (require.main === module) {
+    ingestBlockedIps();
+}

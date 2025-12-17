@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppController } from './app.controller';
-import { HealthCheckService, TypeOrmHealthIndicator } from '@nestjs/terminus';
+import { HealthCheckService, TypeOrmHealthIndicator, MicroserviceHealthIndicator } from '@nestjs/terminus';
+import { ConfigService } from '@nestjs/config';
 
 describe('AppController', () => {
   let appController: AppController;
@@ -17,12 +18,22 @@ describe('AppController', () => {
     pingCheck: jest.fn().mockResolvedValue({ database: { status: 'up' } }),
   };
 
+  const mockMicroserviceHealthIndicator = {
+    pingCheck: jest.fn().mockResolvedValue({ redis: { status: 'up' } }),
+  };
+
+  const mockConfigService = {
+    get: jest.fn().mockReturnValue('localhost'),
+  };
+
   beforeEach(async () => {
     const app: TestingModule = await Test.createTestingModule({
       controllers: [AppController],
       providers: [
         { provide: HealthCheckService, useValue: mockHealthCheckService },
         { provide: TypeOrmHealthIndicator, useValue: mockTypeOrmHealthIndicator },
+        { provide: MicroserviceHealthIndicator, useValue: mockMicroserviceHealthIndicator },
+        { provide: ConfigService, useValue: mockConfigService },
       ],
     }).compile();
 

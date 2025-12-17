@@ -9,6 +9,7 @@ import { IpsModule } from './ips/ips.module';
 import { IpsumModule } from './ipsum/ipsum.module';
 import { IngestModule } from './ingest/ingest.module';
 import { DatabaseModule } from './database/database.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { DatabaseModule } from './database/database.module';
     IpsModule,
     IpsumModule,
     IngestModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],
