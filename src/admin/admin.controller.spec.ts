@@ -46,6 +46,18 @@ describe('AdminController', () => {
     expect(controller).toBeDefined();
   });
 
+  it('should be instantiated manually', () => {
+    const c = new AdminController(
+      mockAuthService as any,
+      mockIpsumService as any,
+      mockIngestService as any,
+    );
+    expect(c).toBeDefined();
+    expect((c as any).authService).toBeDefined();
+    expect((c as any).ipsumService).toBeDefined();
+    expect((c as any).ingestService).toBeDefined();
+  });
+
   describe('generateToken', () => {
     it('should return a token', () => {
       const mockToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
@@ -71,12 +83,25 @@ describe('AdminController', () => {
       expect(ingestService.ingestIps).toHaveBeenCalledWith(mockIps);
     });
 
-    it('should return failure on error', async () => {
+    it('should return failure on error from fetchIps', async () => {
       mockIpsumService.fetchIps.mockRejectedValue(new Error('Fetch failed'));
 
       const result = await controller.ingestIps();
 
       expect(result).toEqual({ success: false, totalIps: 0 });
+      expect(ingestService.ingestIps).not.toHaveBeenCalled();
+    });
+
+    it('should return failure on error from ingestIps', async () => {
+      const mockIps = ['1.2.3.4'];
+      mockIpsumService.fetchIps.mockResolvedValue(mockIps);
+      mockIngestService.ingestIps.mockRejectedValue(new Error('Ingest failed'));
+
+      const result = await controller.ingestIps();
+
+      expect(result).toEqual({ success: false, totalIps: 0 });
+      expect(ipsumService.fetchIps).toHaveBeenCalled();
+      expect(ingestService.ingestIps).toHaveBeenCalledWith(mockIps);
     });
   });
 });

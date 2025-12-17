@@ -236,4 +236,49 @@ describe('IngestService', () => {
       }),
     );
   });
+
+  it('should handle error during client connection', async () => {
+    mockPool.connect.mockRejectedValue(new Error('Connection failed'));
+
+    await expect(service.ingestIps(['1.1.1.1'])).rejects.toThrow(
+      'Connection failed',
+    );
+    expect(mockQueryRunner.release).toHaveBeenCalled();
+  });
+
+  it('should handle error during COPY stream', async () => {
+    const copyError = new Error('COPY stream error');
+    let errorHandler: ((err: Error) => void) | null = null;
+
+    mockCopyStream.on.mockImplementation((event, handler) => {
+      if (event === 'error') {
+        errorHandler = handler;
+      }
+      return mockCopyStream;
+    });
+
+    // Simulate error after stream starts
+    mockCopyStream.end.mockImplementation(() => {
+      if (errorHandler) {
+        setTimeout(() => errorHandler(copyError), 0);
+      }
+      return mockCopyStream;
+    });
+
+    await expect(service.ingestIps(['1.1.1.1'])).rejects.toThrow(
+      'COPY stream error',
+    );
+    expect(mockClient.release).toHaveBeenCalled();
+  });
+
+  it('should handle error during initial query', async () => {
+    // Reset mocks
+    jest.clearAllMocks();
+    mockQueryRunner.query.mockRejectedValueOnce(new Error('Query failed'));
+
+    await expect(service.ingestIps(['1.1.1.1'])).rejects.toThrow(
+      'Query failed',
+    );
+    expect(mockQueryRunner.release).toHaveBeenCalled();
+  });
 });

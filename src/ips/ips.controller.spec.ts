@@ -33,6 +33,8 @@ describe('IpsController', () => {
   it('should be instantiated manually', () => {
     const c = new IpsController(mockIpsService as any);
     expect(c).toBeDefined();
+    expect((c as any).ipsService).toBeDefined();
+    expect((c as any).logger).toBeDefined();
   });
 
   describe('checkIp', () => {
@@ -49,6 +51,14 @@ describe('IpsController', () => {
       const dto: GetIpDto = { ip: '1.2.3.4' };
       const result = await controller.checkIp(dto);
       expect(result).toEqual({ blocked: false });
+      expect(service.findOne).toHaveBeenCalledWith('1.2.3.4');
+    });
+
+    it('should return blocked: true when found is truthy', async () => {
+      mockIpsService.findOne.mockResolvedValue({ ip: '1.2.3.4', id: 1 });
+      const dto: GetIpDto = { ip: '1.2.3.4' };
+      const result = await controller.checkIp(dto);
+      expect(result).toEqual({ blocked: true });
     });
   });
 });

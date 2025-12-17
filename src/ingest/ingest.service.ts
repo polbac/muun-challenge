@@ -11,7 +11,7 @@ export class IngestService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly cacheService: CacheService,
-  ) { }
+  ) {}
 
   async ingestIps(ips: string[]): Promise<void> {
     this.logger.log(`Starting ingestion of ${ips.length} IPs`);
@@ -28,7 +28,6 @@ export class IngestService {
 
       // 3. Copy table structure
       await queryRunner.query(`CREATE TABLE ips_temp (LIKE ips INCLUDING ALL)`);
-
 
       this.logger.log(`Copying ${ips.length} IPs into ips_temp using COPY`);
 

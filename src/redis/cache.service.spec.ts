@@ -30,6 +30,14 @@ describe('CacheService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+    expect((service as any).redis).toBeDefined();
+    expect((service as any).logger).toBeDefined();
+    expect((service as any).TTL).toBe(7200);
+  });
+
+  it('should be instantiated manually', () => {
+    const s = new CacheService(mockRedis as any);
+    expect(s).toBeDefined();
   });
 
   describe('getBlockedIp', () => {

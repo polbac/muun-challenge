@@ -29,6 +29,12 @@ describe('AdminAuthMiddleware', () => {
 
   it('should be defined', () => {
     expect(middleware).toBeDefined();
+    expect((middleware as any).configService).toBeDefined();
+  });
+
+  it('should be instantiated manually', () => {
+    const m = new AdminAuthMiddleware(mockConfigService as any);
+    expect(m).toBeDefined();
   });
 
   describe('use', () => {
@@ -78,8 +84,35 @@ describe('AdminAuthMiddleware', () => {
       mockConfigService.get.mockReturnValue(undefined);
 
       expect(() => middleware.use(req, res, next)).toThrow(
-        'ADMIN_TOKEN not configured',
+        'ADMIN_TOKEN not configured in environment variables',
       );
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('should throw error when providedToken is undefined', () => {
+      const req: any = { headers: {} };
+      const res: any = {};
+      const next = jest.fn();
+
+      mockConfigService.get.mockReturnValue('valid-token');
+
+      expect(() => middleware.use(req, res, next)).toThrow(
+        UnauthorizedException,
+      );
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('should throw error when providedToken is empty string', () => {
+      const req: any = { headers: { 'x-admin-token': '' } };
+      const res: any = {};
+      const next = jest.fn();
+
+      mockConfigService.get.mockReturnValue('valid-token');
+
+      expect(() => middleware.use(req, res, next)).toThrow(
+        UnauthorizedException,
+      );
+      expect(next).not.toHaveBeenCalled();
     });
   });
 });

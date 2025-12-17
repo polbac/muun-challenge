@@ -25,6 +25,14 @@ describe('IpsumService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+    expect((service as any).httpService).toBeDefined();
+    expect((service as any).logger).toBeDefined();
+    expect((service as any).url).toBeDefined();
+  });
+
+  it('should be instantiated manually', () => {
+    const s = new IpsumService(mockHttpService as any);
+    expect(s).toBeDefined();
   });
 
   it('should fetch and parse IPs', async () => {
@@ -66,5 +74,39 @@ describe('IpsumService', () => {
     // Since Step 242 removed the filter, we expect ALL valid IPs.
     expect(result).toEqual(['1.1.1.1', '2.2.2.2', '3.3.3.3', '4.4.4.4']);
     expect(result.length).toBe(4);
+  });
+
+  it('should filter out comments and empty lines', async () => {
+    const mockData = `
+# This is a comment
+1.1.1.1  5
+
+2.2.2.2  3
+# Another comment
+3.3.3.3  1
+`;
+    mockHttpService.get.mockReturnValue(of({ data: mockData }));
+
+    const result = await service.fetchIps();
+
+    expect(result).toEqual(['1.1.1.1', '2.2.2.2', '3.3.3.3']);
+    expect(result.length).toBe(3);
+  });
+
+  it('should handle lines with multiple spaces', async () => {
+    const mockData = `1.1.1.1    5     extra    data`;
+    mockHttpService.get.mockReturnValue(of({ data: mockData }));
+
+    const result = await service.fetchIps();
+
+    expect(result).toEqual(['1.1.1.1']);
+  });
+
+  it('should handle empty response', async () => {
+    mockHttpService.get.mockReturnValue(of({ data: '' }));
+
+    const result = await service.fetchIps();
+
+    expect(result).toEqual([]);
   });
 });
