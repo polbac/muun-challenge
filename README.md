@@ -28,7 +28,7 @@ Edit .env and edit JWT_SECRET with a random string (recommended using a tool lik
 ### Run migrations
 
 ```
-migration:run
+npm run migration:run
 ```
 
 ### Start the application
